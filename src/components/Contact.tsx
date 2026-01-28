@@ -1,5 +1,7 @@
 import { useState, FormEvent } from 'react'
 import './Contact.css'
+import emailjs from '@emailjs/browser'
+
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -11,17 +13,31 @@ const Contact = () => {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setSubmitStatus('idle')
+  e.preventDefault()
+  setIsSubmitting(true)
+  setSubmitStatus('idle')
 
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitStatus('success')
+   try {
+      await emailjs.send(
+        import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        {
+          name: formData.name,
+          email: formData.email,
+          message: formData.message,
+        },
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+      )
+
+    setSubmitStatus('success')
       setFormData({ name: '', email: '', message: '' })
       setTimeout(() => setSubmitStatus('idle'), 3000)
-    }, 1000)
+    } catch (err) {
+      console.error(err)
+      setSubmitStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleChange = (
