@@ -17,6 +17,15 @@ const Contact = () => {
 
   useEffect(() => {
     const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
+    
+    console.log('EmailJS Environment Variables Check:', {
+      serviceId: serviceId || 'NOT FOUND',
+      templateId: templateId || 'NOT FOUND',
+      publicKey: publicKey ? `${publicKey.substring(0, 5)}...` : 'NOT FOUND',
+    })
+    
     if (publicKey) {
       emailjs.init(publicKey)
     }
