@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
 import emailjs from '@emailjs/browser'
 import './Contact.css'
 
@@ -13,11 +13,20 @@ const Contact = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+    if (publicKey) {
+      emailjs.init(publicKey)
+    }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitStatus('idle')
+    setErrorMessage('')
 
     const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
     const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
@@ -25,30 +34,43 @@ const Contact = () => {
 
     if (!serviceId || !templateId || !publicKey) {
       setSubmitStatus('error')
+      setErrorMessage('EmailJS configuration is missing. Please check your .env file.')
       setIsSubmitting(false)
-      console.error('EmailJS configuration is missing. Please check your .env file.')
+      console.error('EmailJS configuration is missing:', {
+        serviceId: !!serviceId,
+        templateId: !!templateId,
+        publicKey: !!publicKey,
+      })
       return
     }
 
     try {
-      await emailjs.send(
+      const result = await emailjs.send(
         serviceId,
         templateId,
         {
-          name: formData.name,
-          email: formData.email,
+          from_name: formData.name,
+          from_email: formData.email,
           message: formData.message,
           to_email: personalEmail,
+          reply_to: formData.email,
         },
         publicKey
       )
 
-      setSubmitStatus('success')
-      setFormData({ name: '', email: '', message: '' })
-      setTimeout(() => setSubmitStatus('idle'), 3000)
-    } catch (err) {
-      console.error(err)
+      if (result.text === 'OK') {
+        setSubmitStatus('success')
+        setFormData({ name: '', email: '', message: '' })
+        setTimeout(() => setSubmitStatus('idle'), 3000)
+      } else {
+        throw new Error('EmailJS returned an error')
+      }
+    } catch (err: any) {
+      console.error('EmailJS Error:', err)
       setSubmitStatus('error')
+      setErrorMessage(
+        err.text || err.message || 'Failed to send message. Please try again later.'
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -151,7 +173,9 @@ const Contact = () => {
               <div className="form-success">Message sent successfully!</div>
             )}
             {submitStatus === 'error' && (
-              <div className="form-error">Something went wrong. Please try again.</div>
+              <div className="form-error">
+                {errorMessage || 'Something went wrong. Please try again.'}
+              </div>
             )}
           </form>
         </div>
