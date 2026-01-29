@@ -1,101 +1,129 @@
-import { useState, FormEvent, useEffect } from 'react'
+import { useState, FormEvent, useEffect, useMemo } from 'react'
 import emailjs from '@emailjs/browser'
 import './Contact.css'
 
-const personalEmail = import.meta.env.VITE_CONTACT_TO_EMAIL || 'your.email@example.com'
+const personalEmail = import.meta.env.VITE_CONTACT_TO_EMAIL || 'kjlucentes@gmail.com'
+
+interface FormData {
+  name: string
+  email: string
+  message: string
+}
+
+type SubmitStatus = 'idle' | 'success' | 'error'
 
 const Contact = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
     message: '',
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
-  useEffect(() => {
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
-    
-    console.log('EmailJS Environment Variables Check:', {
-      serviceId: serviceId || 'NOT FOUND',
-      templateId: templateId || 'NOT FOUND',
-      publicKey: publicKey ? `${publicKey.substring(0, 5)}...` : 'NOT FOUND',
-    })
-    
-    if (publicKey) {
-      emailjs.init(publicKey)
+  // Memoize environment variables
+  const emailConfig = useMemo(() => {
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID?.trim()
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID?.trim()
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY?.trim()
+
+    return {
+      serviceId,
+      templateId,
+      publicKey,
+      isValid: Boolean(serviceId && templateId && publicKey),
     }
   }, [])
 
-  const handleSubmit = async (e: FormEvent) => {
+  useEffect(() => {
+    if (emailConfig.publicKey) {
+      emailjs.init(emailConfig.publicKey)
+    }
+  }, [emailConfig.publicKey])
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitStatus('idle')
     setErrorMessage('')
 
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID?.trim()
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID?.trim()
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY?.trim()
+    // Validate EmailJS configuration
+    if (!emailConfig.isValid) {
+      const missingVars: string[] = []
+      if (!emailConfig.serviceId || emailConfig.serviceId.includes('your_') || emailConfig.serviceId.includes('here')) {
+        missingVars.push('VITE_EMAILJS_SERVICE_ID')
+      }
+      if (!emailConfig.templateId || emailConfig.templateId.includes('your_') || emailConfig.templateId.includes('here')) {
+        missingVars.push('VITE_EMAILJS_TEMPLATE_ID')
+      }
+      if (!emailConfig.publicKey || emailConfig.publicKey.includes('your_') || emailConfig.publicKey.includes('here')) {
+        missingVars.push('VITE_EMAILJS_PUBLIC_KEY')
+      }
 
-    // Check for missing or placeholder values
-    const missingVars: string[] = []
-    if (!serviceId || serviceId.includes('your_') || serviceId.includes('here')) {
-      missingVars.push('VITE_EMAILJS_SERVICE_ID')
-    }
-    if (!templateId || templateId.includes('your_') || templateId.includes('here')) {
-      missingVars.push('VITE_EMAILJS_TEMPLATE_ID')
-    }
-    if (!publicKey || publicKey.includes('your_') || publicKey.includes('here')) {
-      missingVars.push('VITE_EMAILJS_PUBLIC_KEY')
-    }
-
-    if (missingVars.length > 0) {
       setSubmitStatus('error')
       setErrorMessage(
         `EmailJS configuration is missing: ${missingVars.join(', ')}. Please check your .env file and restart the dev server.`
       )
       setIsSubmitting(false)
-      console.error('EmailJS configuration is missing:', {
-        serviceId: serviceId || 'MISSING',
-        templateId: templateId || 'MISSING',
-        publicKey: publicKey ? `${publicKey.substring(0, 5)}...` : 'MISSING',
-        missingVars,
-      })
+      return
+    }
+
+    // Validate form data
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+      setSubmitStatus('error')
+      setErrorMessage('Please fill in all fields.')
+      setIsSubmitting(false)
+      return
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setSubmitStatus('error')
+      setErrorMessage('Please enter a valid email address.')
+      setIsSubmitting(false)
       return
     }
 
     try {
       const result = await emailjs.send(
-        serviceId,
-        templateId,
+        emailConfig.serviceId!,
+        emailConfig.templateId!,
         {
-          from_name: formData.name,
-          from_email: formData.email,
-          message: formData.message,
+          from_name: formData.name.trim(),
+          from_email: formData.email.trim(),
+          message: formData.message.trim(),
           to_email: personalEmail,
-          reply_to: formData.email,
+          reply_to: formData.email.trim(),
         },
-        publicKey
+        emailConfig.publicKey!
       )
 
-      if (result.text === 'OK') {
+      if (result.status === 200 && result.text === 'OK') {
         setSubmitStatus('success')
         setErrorMessage('')
         setFormData({ name: '', email: '', message: '' })
-        setTimeout(() => setSubmitStatus('idle'), 3000)
+        setTimeout(() => setSubmitStatus('idle'), 5000)
       } else {
-        throw new Error('EmailJS returned an error')
+        throw new Error(result.text || 'EmailJS returned an error')
       }
-    } catch (err: any) {
-      console.error('EmailJS Error:', err)
+    } catch (err: unknown) {
+      const error = err as { text?: string; message?: string; status?: number }
+      console.error('EmailJS Error:', error)
       setSubmitStatus('error')
-      setErrorMessage(
-        err.text || err.message || 'Failed to send message. Please try again later.'
-      )
+      
+      // Provide user-friendly error messages
+      if (error.status === 0) {
+        setErrorMessage('Network error. Please check your internet connection and try again.')
+      } else if (error.text) {
+        setErrorMessage(`Failed to send: ${error.text}`)
+      } else if (error.message) {
+        setErrorMessage(`Failed to send: ${error.message}`)
+      } else {
+        setErrorMessage('Failed to send message. Please try again later.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -104,7 +132,14 @@ const Contact = () => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    
+    // Clear error message when user starts typing
+    if (submitStatus === 'error') {
+      setSubmitStatus('idle')
+      setErrorMessage('')
+    }
   }
 
   const socialLinks = [
