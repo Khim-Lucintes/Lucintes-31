@@ -28,18 +28,33 @@ const Contact = () => {
     setSubmitStatus('idle')
     setErrorMessage('')
 
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID?.trim()
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID?.trim()
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY?.trim()
 
-    if (!serviceId || !templateId || !publicKey) {
+    // Check for missing or placeholder values
+    const missingVars: string[] = []
+    if (!serviceId || serviceId.includes('your_') || serviceId.includes('here')) {
+      missingVars.push('VITE_EMAILJS_SERVICE_ID')
+    }
+    if (!templateId || templateId.includes('your_') || templateId.includes('here')) {
+      missingVars.push('VITE_EMAILJS_TEMPLATE_ID')
+    }
+    if (!publicKey || publicKey.includes('your_') || publicKey.includes('here')) {
+      missingVars.push('VITE_EMAILJS_PUBLIC_KEY')
+    }
+
+    if (missingVars.length > 0) {
       setSubmitStatus('error')
-      setErrorMessage('EmailJS configuration is missing. Please check your .env file.')
+      setErrorMessage(
+        `EmailJS configuration is missing: ${missingVars.join(', ')}. Please check your .env file and restart the dev server.`
+      )
       setIsSubmitting(false)
       console.error('EmailJS configuration is missing:', {
-        serviceId: !!serviceId,
-        templateId: !!templateId,
-        publicKey: !!publicKey,
+        serviceId: serviceId || 'MISSING',
+        templateId: templateId || 'MISSING',
+        publicKey: publicKey ? `${publicKey.substring(0, 5)}...` : 'MISSING',
+        missingVars,
       })
       return
     }
