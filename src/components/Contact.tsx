@@ -60,6 +60,7 @@ const Contact = () => {
 
       if (result.text === 'OK') {
         setSubmitStatus('success')
+        setErrorMessage('')
         setFormData({ name: '', email: '', message: '' })
         setTimeout(() => setSubmitStatus('idle'), 3000)
       } else {
