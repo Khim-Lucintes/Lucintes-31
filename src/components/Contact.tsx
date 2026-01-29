@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react'
-import './Contact.css'
 import emailjs from '@emailjs/browser'
+import './Contact.css'
 
+const personalEmail = import.meta.env.VITE_CONTACT_TO_EMAIL || 'your.email@example.com'
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -9,15 +10,16 @@ const Contact = () => {
     email: '',
     message: '',
   })
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
   const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault()
-  setIsSubmitting(true)
-  setSubmitStatus('idle')
+    e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitStatus('idle')
 
-   try {
+    try {
       await emailjs.send(
         import.meta.env.VITE_EMAILJS_SERVICE_ID,
         import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
@@ -25,11 +27,12 @@ const Contact = () => {
           name: formData.name,
           email: formData.email,
           message: formData.message,
+          to_email: personalEmail,
         },
         import.meta.env.VITE_EMAILJS_PUBLIC_KEY
       )
 
-    setSubmitStatus('success')
+      setSubmitStatus('success')
       setFormData({ name: '', email: '', message: '' })
       setTimeout(() => setSubmitStatus('idle'), 3000)
     } catch (err) {
@@ -43,17 +46,14 @@ const Contact = () => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
   const socialLinks = [
     { name: 'GitHub', url: 'https://github.com', icon: 'github' },
     { name: 'LinkedIn', url: 'https://linkedin.com', icon: 'linkedin' },
     { name: 'Twitter', url: 'https://twitter.com', icon: 'twitter' },
-    { name: 'Email', url: 'mailto:your.email@example.com', icon: 'email' },
+    { name: 'Email', url: `mailto:${personalEmail}`, icon: 'email' },
   ]
 
   return (
